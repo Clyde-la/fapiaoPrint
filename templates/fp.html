@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>发票</title>
+    <link rel="icon" href="data:image/ico;base64,aWNv">
+    <!-- 新 Bootstrap5 核心 CSS 文件 -->
+    <link rel="stylesheet" href="https://cdn.staticfile.org/twitter-bootstrap/5.1.1/css/bootstrap.min.css">
+
+    <!--  popper.min.js 用于弹窗、提示、下拉菜单 -->
+    <script src="https://cdn.staticfile.org/popper.js/2.9.3/umd/popper.min.js"></script>
+
+    <!-- 最新的 Bootstrap5 核心 JavaScript 文件 -->
+    <script src="https://cdn.staticfile.org/twitter-bootstrap/5.1.1/js/bootstrap.min.js"></script>
+    <style>
+        .upload-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            /*height: 300px;*/
+            height: 90vh;
+        }
+
+        .upload-box {
+            border: 2px dashed #007bff;
+            border-radius: 10px;
+            padding: 30px;
+            text-align: center;
+            cursor: pointer;
+        }
+
+        .dragover {
+            background-color: #e9ecef !important;
+        }
+
+        /*.upload-box.dragover {*/
+        /*    background-color: #e9ecef;*/
+        /*}*/
+
+        #pdfViewer {
+            margin-left: 10px;
+            display: none;
+            width: 80%;
+            height: 100vh;
+            border: none;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container upload-container">
+    <div class="upload-box" id="uploadBox">
+        <h3>将发票拖到此处或点击上传</h3>
+        <input type="file" id="fileInput" multiple style="display: none;">
+    </div>
+</div>
+
+<iframe id="pdfViewer"></iframe>
+
+
+<script>
+    const uploadBox = document.getElementById('uploadBox');
+    const fileInput = document.getElementById('fileInput');
+    const pdfViewer = document.getElementById('pdfViewer');
+    const container = document.getElementById('container');
+
+    uploadBox.addEventListener('click', () => {
+        fileInput.click();
+    });
+
+    document.addEventListener('dragover', (event) => {
+        event.preventDefault();
+        uploadBox.classList.add('dragover');
+    });
+
+    document.addEventListener('dragleave', () => {
+        uploadBox.classList.remove('dragover');
+    });
+
+    document.addEventListener('drop', (event) => {
+        event.preventDefault();
+        uploadBox.classList.remove('dragover');
+        const files = event.dataTransfer.files;
+        handleFiles(files);
+    });
+
+    fileInput.addEventListener('change', (event) => {
+        const files = event.target.files;
+        handleFiles(files);
+    });
+
+    function handleFiles(files) {
+        const formData = new FormData();
+        for (const file of files) {
+            formData.append('files', file);
+        }
+        uploadFiles(formData);
+    }
+
+    function uploadFiles(formData) {
+        fetch('/fp_upload', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.blob())
+        .then(blob => {
+            const url = URL.createObjectURL(blob);
+            pdfViewer.src = url;
+            pdfViewer.style.display = 'block';
+
+            pdfViewer.onload = function () {
+                pdfViewer.contentWindow.print();
+            };
+        })
+        .catch((error) => {
+            console.error('Error:', error);
+        });
+    }
+</script>
+
+</body>
+</html>
