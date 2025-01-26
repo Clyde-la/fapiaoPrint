@@ -1,16 +1,26 @@
-from pypdf import PaperSize, PdfReader, PdfWriter, Transformation
-
+from pypdf import PaperSize, PdfReader, PdfWriter
+from reportlab.pdfgen import canvas
+from io import BytesIO
 
 # The PaperSize Class — pypdf 4.3.0 documentation
 # https://pypdf.readthedocs.io/en/latest/modules/PaperSize.html
 
 def format_to_a5(pdf_file):
     writer1 = PdfWriter()
-    destPage = writer1.add_blank_page(width=PaperSize.A5.height, height=PaperSize.A5.width)  # h595 w400
+    destPage = writer1.add_blank_page(width=PaperSize.A5.height, height=PaperSize.A5.width)  # h595 w420
+    # print(f"a5尺寸: 【高：{PaperSize.A5.height}】\t宽：{PaperSize.A5.width}")
     reader = PdfReader(pdf_file)
     sourcePage = reader.pages[0]
-    h = 0 if sourcePage.mediabox.height < 500 else -PaperSize.A5.width
-    destPage.merge_transformed_page(sourcePage, Transformation().translate(0, h))
+    # print(f"原始页面尺寸: 【高：{sourcePage.mediabox.height}】\t宽：{sourcePage.mediabox.width}  ")
+    if 420 < sourcePage.mediabox.height < 550:
+        # scale_rate = sourcePage.mediabox.height / PaperSize.A5.height
+        scale_rate = 420 / sourcePage.mediabox.height
+        # print(f"缩放比例:{scale_rate}")
+        sourcePage.scale_by(scale_rate )
+    h = 0 if sourcePage.mediabox.height < 550 else -PaperSize.A5.width
+    w = (PaperSize.A5.height - sourcePage.mediabox.width) / 2
+    # destPage.merge_transformed_page(sourcePage, Transformation().translate(0, h))
+    destPage.merge_translated_page(sourcePage, w, h)
     return destPage
     # writer1.write("out.pdf")
 
@@ -20,14 +30,36 @@ def merge2(file, writer):
 
     for i in range(len(file)):
         sourcePage = format_to_a5(file[i])
+        # print(f"[merge2]原始页面尺寸: 【高：{sourcePage.mediabox.height}】\t宽：{sourcePage.mediabox.width}  ")
 
         height = sourcePage.mediabox.height
         # print("高",height)
 
         sourcePage.scale_by(0.9)
         w = (PaperSize.A4.width - sourcePage.mediabox.width) / 2
-        destPage.merge_transformed_page(sourcePage, Transformation().translate(w, 50 + i * height))
+        # destPage.merge_transformed_page(sourcePage, Transformation().translate(w, 50 + i * height))
+        destPage.merge_translated_page(sourcePage, w+10, (1 - i) * height)
 
+
+# 创建一个新的 PDF 页面，并在中间画一条横线
+def create_line_page():
+    A4_WIDTH, A4_HEIGHT = PaperSize.A4.width, PaperSize.A4.height
+    packet = BytesIO()
+    can = canvas.Canvas(packet, pagesize=(A4_WIDTH, A4_HEIGHT))
+
+    # 计算中间位置的 Y 坐标
+    middle_y = A4_HEIGHT / 2
+
+    # 画一条横线
+    can.setStrokeColorRGB(0.5, 0.5, 0.5)  # 设置线条颜色为黑色
+    can.setLineWidth(0.3)  # 设置线条宽度
+    can.line(0, middle_y, A4_WIDTH, middle_y)  # 从 (50, middle_y) 到 (A4_WIDTH - 50, middle_y)
+
+    can.save()  # 保存绘制的内容
+
+    # 将内容写入 BytesIO 对象
+    packet.seek(0)
+    return packet
 
 def main1(file_all):
     result_writer = PdfWriter()
@@ -38,6 +70,22 @@ def main1(file_all):
 
         merge2(file_pairs, result_writer)
     # writer.write("out.pdf")
+
+    # 打开现有的 PDF 文件
+    # reader = PdfReader("input.pdf")
+    writer = PdfWriter()
+
+    # 遍历每一页
+    for page in result_writer.pages:
+        # 创建一个包含横线的新页面
+        line_page_packet = create_line_page()
+        line_page = PdfReader(line_page_packet).pages[0]
+
+        # 将横线页面合并到原始页面
+        page.merge_page(line_page)
+
+        # 将修改后的页面添加到 PdfWriter
+        writer.add_page(page)
     return result_writer
 
 
